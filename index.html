@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#3f8747" />
+    <meta name="description" content="A tiny top-down pixel-art scene. Every sprite is drawn in code." />
+    <title>Pixel Meadow</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #2a2238;
+        overflow: hidden;
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      canvas {
+        display: block;
+        position: fixed;
+        left: 0;
+        top: 0;
+        image-rendering: crisp-edges;
+        image-rendering: pixelated;
+        touch-action: none;
+      }
+      noscript {
+        color: #fff5da;
+        font: 16px/1.4 monospace;
+        display: block;
+        padding: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <noscript>Pixel Meadow needs JavaScript to draw its pixels.</noscript>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
