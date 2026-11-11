@@ -49,6 +49,22 @@ const DUSK = sprite(
   'dusk',
 );
 
+const CLOUD = sprite(
+  [
+    '.........',
+    '...ccc...',
+    '..cCCCcc.',
+    '.cCCCCCCc',
+    '.cccccccc',
+    '.........',
+    '.b..b..b.',
+    'b..b..b..',
+    '.........',
+  ],
+  { c: P.stone2, C: P.white, b: P.water2 },
+  'cloud',
+);
+
 export function panel(g, x, y, w, h, paper = true) {
   g.fillStyle = P.ink2;
   g.fillRect(x + 1, y, w - 2, h);
@@ -91,28 +107,48 @@ export function wrap(text, maxW) {
 }
 
 export function drawHud(g, vw, vh, game) {
-  const { tod, phase, dark, time } = game.sky;
+  const { phase, dark, time } = game.sky;
   // time-of-day badge
   const label = phase;
   const bw = textWidth(label) + 24;
   panel(g, vw - bw - 4, 4, bw, 15, false);
-  const icon = dark > 0.6 ? MOON : dark > 0.12 ? DUSK : SUN;
+  const icon = game.rainAmt > 0.5 ? CLOUD : dark > 0.6 ? MOON : dark > 0.12 ? DUSK : SUN;
   g.drawImage(icon, vw - bw - 1, 7);
   drawText(g, label, vw - bw + 11, 8, P.cream1, P.wood5);
-  void tod;
+  game.ui.time = [vw - bw - 4, 4, bw, 15];
+
+  // gallery button
+  const gl = 'Gallery';
+  const gw = textWidth(gl) + 21;
+  panel(g, 4, 4, gw, 15, false);
+  const sw = [P.red2, P.gold2, P.water3, P.leaf2];
+  for (let i = 0; i < 4; i++) {
+    g.fillStyle = P.wood5;
+    g.fillRect(7 + (i % 2) * 5, 7 + (i >> 1) * 5, 5, 5);
+    g.fillStyle = sw[i];
+    g.fillRect(8 + (i % 2) * 5, 8 + (i >> 1) * 5, 3, 3);
+  }
+  drawText(g, gl, 20, 8, P.cream1, P.wood5);
+  game.ui.gallery = [4, 4, gw, 15];
 
   // controls hint
   const a = game.hintT;
   if (a > 0 && !game.dialog) {
     const lines = game.touch
-      ? ['Left thumb: move', 'Right thumb: hold to run, tap to talk']
-      : ['WASD / Arrows: move     Shift: run     Space: talk', 'G: sprite gallery     T: skip time'];
+      ? ['Left thumb: move', 'Right thumb: hold = run', 'Tap: talk / hop']
+      : ['WASD / Arrows: move     Shift: run     Space: talk / hop', 'G: gallery     T: skip time     R: rain'];
+    const fit = lines.filter((l) => textWidth(l) <= vw - 8);
     const blink = a < 1.5 && Math.floor(time * 8) % 2 === 0;
-    if (!blink) {
-      let y = vh - 8 - lines.length * LINE_H;
-      for (const l of lines) {
-        if (textWidth(l) > vw - 8) continue;
-        drawTextCentered(g, l, vw / 2, y, P.white, P.ink);
+    if (!blink && fit.length) {
+      const h = fit.length * LINE_H + 5;
+      let y = vh - h - 3;
+      g.fillStyle = 'rgba(42,34,56,0.62)';
+      g.fillRect(0, y, vw, h);
+      g.fillStyle = P.ink;
+      g.fillRect(0, y - 1, vw, 1);
+      y += 4;
+      for (const l of fit) {
+        drawTextCentered(g, l, vw / 2, y, P.cream1, P.ink);
         y += LINE_H;
       }
     }
@@ -199,4 +235,12 @@ function disc(g, cx, cy, r, col) {
     const half = Math.round(Math.sqrt(r * r - y * y));
     g.fillRect(cx - half, cy + y, half * 2 + 1, 1);
   }
+}
+
+export function drawBackButton(g, vw) {
+  const label = 'Back';
+  const w = textWidth(label) + 12;
+  panel(g, vw - w - 4, 4, w, 15, false);
+  drawText(g, label, vw - w + 2, 8, P.cream1, P.wood5);
+  return [vw - w - 8, 0, w + 12, 24];
 }

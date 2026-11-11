@@ -2,6 +2,8 @@
 import { clamp } from './pixel.js';
 import { CHAR_H } from './art/character.js';
 
+const HOP_TIME = 0.34;
+
 const DIRS = {
   down: [0, 1],
   up: [0, -1],
@@ -77,9 +79,16 @@ class Walker {
     this.nextBlink = 2 + Math.random() * 3;
     this.shadow = [6, 2, 0];
     this.lastFrame = -1;
+    this.hopT = 0;
+    this.landT = 0;
   }
   get sortY() {
     return this.y;
+  }
+  /** height above the ground while hopping, in whole pixels */
+  get lift() {
+    if (this.hopT <= 0) return 0;
+    return Math.round(Math.sin((1 - this.hopT / HOP_TIME) * Math.PI) * 9);
   }
   tickAnim(dt) {
     if (this.moving) {
@@ -100,14 +109,19 @@ class Walker {
     const set = this.sprites[this.dir];
     if (this.moving) {
       const i = Math.floor(this.animT) % 4;
-      return [set.walk[i], i];
+      return [(this.running && set.run ? set.run : set.walk)[i], i];
     }
     const i = Math.floor(this.idleT * 1.5) % 2;
     return [(this.blink > 0 ? set.blink : set.idle)[i], -1];
   }
   draw(g) {
-    const [f] = this.currentFrame();
-    g.drawImage(f, Math.round(this.x) - 8, Math.round(this.y) - (CHAR_H - 1));
+    let [f] = this.currentFrame();
+    const lift = this.lift;
+    const set = this.sprites[this.dir];
+    if (lift > 0) f = set.walk[0]; // tucked legs in the air
+    else if (this.landT > 0 && !this.moving) f = set.idle[1]; // 1px squash on landing
+    this.shadow[0] = lift > 5 ? 4 : lift > 1 ? 5 : 6;
+    g.drawImage(f, Math.round(this.x) - 8, Math.round(this.y) - (CHAR_H - 1) - lift);
   }
 }
 
@@ -173,12 +187,24 @@ export class Player extends Walker {
       this.moving = false;
     }
     this.tickAnim(dt);
+    if (this.landT > 0) this.landT -= dt;
+    if (this.hopT > 0) {
+      this.hopT -= dt;
+      if (this.hopT <= 0) {
+        this.landT = 0.12;
+        fx.dust(this.x - 3, this.y);
+        fx.dust(this.x + 3, this.y);
+      }
+    }
     // a little puff each time a foot lands
     const [, step] = this.currentFrame();
     if (step !== this.lastFrame) {
-      if ((step === 0 || step === 2) && !this.running) fx.step(this.x, this.y);
+      if ((step === 0 || step === 2) && !this.running && this.hopT <= 0) fx.step(this.x, this.y);
       this.lastFrame = step;
     }
+  }
+  hop() {
+    if (this.hopT <= 0) this.hopT = HOP_TIME;
   }
   facingPoint(d = 12) {
     const [dx, dy] = DIRS[this.dir];
@@ -226,9 +252,9 @@ export class Villager extends Walker {
     const dy = ty - this.y;
     const d = Math.hypot(dx, dy);
     if (d < 1.5) {
+      // a truthy third value marks a waypoint where the villager lingers
+      this.wait = this.route[this.target][2] ? 2.5 + Math.random() * 2 : 0;
       this.target = (this.target + 1) % this.route.length;
-      this.wait = this.route[this.target][2] ?? 0;
-      if (this.route[(this.target + this.route.length - 1) % this.route.length][2]) this.wait = 2.5 + Math.random() * 2;
     } else {
       const sp = 30 * dt;
       this.x += (dx / d) * Math.min(sp, d);

@@ -1,7 +1,7 @@
 // Scenery props: rocks, plants, crops, furniture. Mostly hand-placed pixels,
 // with a few procedural painters where repetition helps (fence, barrel, crate).
 import { P } from '../palette.js';
-import { sprite, swayFrames, Buf, hash2 } from '../pixel.js';
+import { sprite, swayFrames, Buf } from '../pixel.js';
 
 const STONE = { o: P.stone5, 1: P.stone1, 2: P.stone2, 3: P.stone3, 4: P.stone4, m: P.leaf3, M: P.leaf4 };
 const WOOD = { o: P.wood5, 1: P.wood1, 2: P.wood2, 3: P.wood3, 4: P.wood4 };

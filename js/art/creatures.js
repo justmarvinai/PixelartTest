@@ -1,6 +1,6 @@
 // Small animals. All authored facing right; the engine mirrors them.
 import { P } from '../palette.js';
-import { sprite, flipH } from '../pixel.js';
+import { sprite } from '../pixel.js';
 
 // ------------------------------------------------------------------ chicken
 
@@ -224,6 +224,5 @@ export function buildCreatures() {
       butterfly(P.water2, P.water4, 'fly-b'),
       butterfly(P.white, P.cream2, 'fly-w'),
     ],
-    flip: flipH,
   };
 }

@@ -8,8 +8,8 @@ import { buildTrees } from './art/trees.js';
 import { buildHouse } from './art/house.js';
 import { buildWorld } from './world.js';
 import { Player, Villager, Hen, Chick, Duck, Cat, Butterfly } from './entities.js';
-import { Fx, WaterFx, Lighting, Fireflies, makeCloudShadow, darknessAt, phaseName } from './fx.js';
-import { drawHud } from './ui.js';
+import { Fx, WaterFx, Lighting, Fireflies, Rain, makeCloudShadow, darknessAt, phaseName, skyAt } from './fx.js';
+import { drawHud, drawBackButton } from './ui.js';
 import { drawGallery, gallerySections } from './gallery.js';
 import { TILE } from './terrain.js';
 
@@ -39,6 +39,7 @@ const fx = new Fx();
 const water = new WaterFx(world.terrain);
 const lighting = new Lighting();
 const fireflies = new Fireflies(26, world.W, world.H);
+const rain = new Rain();
 const clouds = [0, 1, 2].map((i) => ({
   img: makeCloudShadow(i * 7 + 1),
   x: i * 330 - 100,
@@ -93,8 +94,11 @@ const game = {
   dialog: null,
   prompt: null,
   hintT: 14,
-  touch: false,
+  touch: window.matchMedia?.('(pointer: coarse)').matches || false,
   stick: null,
+  ui: { gallery: null, time: null, back: null },
+  raining: params.has('rain'),
+  rainAmt: params.has('rain') ? 1 : 0,
   gallery: params.has('gallery'),
   galleryScroll: 0,
   galleryH: 0,
@@ -163,6 +167,8 @@ window.addEventListener('keydown', (e) => {
     game.gallery = !game.gallery;
   } else if (e.code === 'KeyT' || e.code === 'KeyN') {
     skipTime();
+  } else if (e.code === 'KeyR') {
+    game.raining = !game.raining;
   } else if (e.code === 'KeyH') {
     game.hintT = game.hintT > 0 ? 0 : 10;
   } else if (e.code === 'Escape') {
@@ -183,23 +189,40 @@ window.addEventListener(
   { passive: true },
 );
 
-// touch: left half is a floating stick, right half = hold to run / tap to talk
+// pointer: HUD buttons for everyone; on touch the left half is a floating
+// stick and the right half is hold-to-run / tap-to-interact
 const toView = (e) => {
   const r = canvas.getBoundingClientRect();
   return [((e.clientX - r.left) / r.width) * vw, ((e.clientY - r.top) / r.height) * vh];
 };
+const inRect = (r, x, y) => r && x >= r[0] && x < r[0] + r[2] && y >= r[1] && y < r[1] + r[3];
 let stickId = null;
 let actionId = null;
 let actionDown = 0;
 let dragY = null;
 canvas.addEventListener('pointerdown', (e) => {
-  if (e.pointerType === 'mouse') return;
-  e.preventDefault();
-  game.touch = true;
   const [x, y] = toView(e);
+  const touch = e.pointerType !== 'mouse';
+  if (touch) {
+    game.touch = true;
+    e.preventDefault();
+  }
   if (game.gallery) {
-    dragY = y;
-    actionDown = performance.now();
+    if (inRect(game.ui.back, x, y)) game.gallery = false;
+    else if (touch) dragY = y;
+    return;
+  }
+  if (inRect(game.ui.gallery, x, y)) {
+    game.gallery = true;
+    return;
+  }
+  if (inRect(game.ui.time, x, y)) {
+    skipTime();
+    return;
+  }
+  if (!touch) return;
+  if (game.dialog) {
+    act();
     return;
   }
   if (x < vw * 0.5 && stickId === null) {
@@ -213,9 +236,11 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => {
   if (e.pointerType === 'mouse') return;
   const [x, y] = toView(e);
-  if (game.gallery && dragY !== null) {
-    game.galleryScroll -= y - dragY;
-    dragY = y;
+  if (game.gallery) {
+    if (dragY !== null) {
+      game.galleryScroll -= y - dragY;
+      dragY = y;
+    }
     return;
   }
   if (e.pointerId === stickId && game.stick) {
@@ -232,23 +257,14 @@ canvas.addEventListener('pointermove', (e) => {
 });
 const pointerEnd = (e) => {
   if (e.pointerType === 'mouse') return;
-  if (game.gallery) {
-    dragY = null;
-    const [x, y] = toView(e);
-    if (performance.now() - actionDown < 220 && x > vw - 60 && y < 24) game.gallery = false;
-    return;
-  }
+  dragY = null;
   if (e.pointerId === stickId) {
     stickId = null;
     game.stick = null;
   }
   if (e.pointerId === actionId) {
     actionId = null;
-    if (performance.now() - actionDown < 240) {
-      const [x, y] = toView(e);
-      if (x > vw - 80 && y < 22) skipTime();
-      else act();
-    }
+    if (!game.gallery && performance.now() - actionDown < 240) act();
   }
 };
 canvas.addEventListener('pointerup', pointerEnd);
@@ -351,6 +367,7 @@ function act() {
   }
   const it = nearestInteractable();
   if (it) it.run();
+  else player.hop();
 }
 
 // -------------------------------------------------------------------- update
@@ -376,6 +393,10 @@ function update(dt) {
   for (const a of actors) a.update(dt, game);
   for (const t of world.tufts) if (t.rustle > 0) t.rustle -= dt;
   fireflies.update(dt);
+  game.rainAmt = clamp(game.rainAmt + (game.raining ? dt : -dt) * 0.7, 0, 1);
+  if (game.rainAmt > 0 || rain.drops.length) {
+    rain.update(dt, game.rainAmt, { x: camX, y: camY, w: vw, h: vh }, world.terrain, fx);
+  }
   fx.update(dt);
   water.update(dt, sky.time, fx.ripples);
 
@@ -417,6 +438,7 @@ function render() {
   const t = sky.time;
   if (game.gallery) {
     game.galleryH = drawGallery(g, vw, vh, sections, t, Math.round(game.galleryScroll));
+    game.ui.back = drawBackButton(g, vw);
     return;
   }
 
@@ -477,19 +499,23 @@ function render() {
     }
   }
   fx.draw(g, t);
+  rain.draw(g);
   g.restore();
 
   // drifting cloud shadows by day
-  const cloudA = 0.1 * (1 - clamp(sky.dark * 1.6, 0, 1));
+  const cloudA = 0.1 * (1 - clamp(sky.dark * 1.6, 0, 1)) * (1 - game.rainAmt);
   if (cloudA > 0.005) {
     g.globalAlpha = cloudA;
     for (const c of clouds) g.drawImage(c.img, Math.round(c.x - camX), Math.round(c.y - camY));
     g.globalAlpha = 1;
   }
 
-  // night lightmap
+  // ambient colour: time of day, dimmed and cooled by rain
+  const amb = skyAt(sky.tod);
+  const wet = game.rainAmt;
+  const ambient = [amb[0] * (1 - 0.3 * wet), amb[1] * (1 - 0.22 * wet), amb[2] * (1 - 0.1 * wet)];
+  const lights = [];
   if (sky.dark > 0.01) {
-    const lights = [];
     for (const l of world.lights) {
       if (l.x < x0 - l.r || l.x > x1 + l.r || l.y < y0 - l.r || l.y > y1 + l.r) continue;
       lights.push({ x: l.x - camX, y: l.y - camY, r: l.r, kind: 'warm' });
@@ -500,7 +526,9 @@ function render() {
         lights.push({ x: f.x - camX, y: f.y - camY, r: 9, kind: 'fly' });
       }
     }
-    lighting.draw(g, vw, vh, sky.tod, lights);
+  }
+  lighting.draw(g, vw, vh, ambient, sky.dark * 1.25, lights);
+  if (sky.dark > 0.35) {
     g.save();
     g.translate(-camX, -camY);
     fireflies.draw(g, sky.dark);
@@ -517,12 +545,12 @@ function render() {
 // ---------------------------------------------------------------------- loop
 let last = performance.now();
 function frame(now) {
+  requestAnimationFrame(frame);
   // rAF timestamps can predate module start, so never let time run backwards
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
   last = now;
   update(dt);
   render();
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 

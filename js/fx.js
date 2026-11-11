@@ -295,7 +295,7 @@ function lightSprite(r, rgb) {
 }
 
 const WARM = [255, 196, 120];
-const FIREFLY = [190, 235, 120];
+const FIREFLY = [120, 160, 70];
 
 // time-of-day keyframes: [t, r, g, b]
 const SKY = [
@@ -342,32 +342,99 @@ export class Lighting {
     this.canvas = makeCanvas(1, 1);
     this.g = ctxOf(this.canvas);
   }
-  /** lights: [{x,y,r,kind}] in screen space */
-  draw(target, vw, vh, tod, lights) {
-    const dark = darknessAt(tod);
-    if (dark <= 0.01) return;
+  /**
+   * Multiply the frame by an ambient colour, with lights punched back in.
+   * ambient: [r,g,b]; glow: 0..1 strength of the lights; lights in screen space.
+   */
+  draw(target, vw, vh, ambient, glow, lights) {
+    const [r, gg, b] = ambient;
+    if (r > 252 && gg > 252 && b > 252) return;
     if (this.canvas.width !== vw || this.canvas.height !== vh) {
       this.canvas.width = vw;
       this.canvas.height = vh;
       this.g = ctxOf(this.canvas);
     }
     const g = this.g;
-    const [r, gg, b] = skyAt(tod);
     g.globalCompositeOperation = 'source-over';
     g.globalAlpha = 1;
     g.fillStyle = `rgb(${r | 0},${gg | 0},${b | 0})`;
     g.fillRect(0, 0, vw, vh);
-    g.globalCompositeOperation = 'lighter';
-    g.globalAlpha = Math.min(1, dark * 1.25);
-    for (const l of lights) {
-      const s = lightSprite(l.r, l.kind === 'fly' ? FIREFLY : WARM);
-      g.drawImage(s, Math.round(l.x - l.r), Math.round(l.y - l.r));
+    if (glow > 0.01) {
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = Math.min(1, glow);
+      for (const l of lights) {
+        const s = lightSprite(l.r, l.kind === 'fly' ? FIREFLY : WARM);
+        g.drawImage(s, Math.round(l.x - l.r), Math.round(l.y - l.r));
+      }
     }
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
     target.globalCompositeOperation = 'multiply';
     target.drawImage(this.canvas, 0, 0);
     target.globalCompositeOperation = 'source-over';
+  }
+}
+
+// ---------------------------------------------------------------------- rain
+
+export class Rain {
+  constructor() {
+    this.drops = [];
+    this.splashes = [];
+    this.acc = 0;
+  }
+  update(dt, amount, view, terrain, fx) {
+    this.acc += dt * amount * ((view.w * view.h) / 230);
+    while (this.acc >= 1) {
+      this.acc -= 1;
+      const tx = view.x - 20 + Math.random() * (view.w + 40);
+      const ty = view.y - 10 + Math.random() * (view.h + 30);
+      this.drops.push({ x: tx + 24, y: ty - 96, tx, ty });
+    }
+    for (const d of this.drops) {
+      d.y += 340 * dt;
+      d.x -= 85 * dt;
+      if (d.y >= d.ty) {
+        d.done = true;
+        const px = Math.round(d.tx);
+        const py = Math.round(d.ty);
+        const wet =
+          px >= 0 && py >= 0 && px < terrain.W && py < terrain.H && terrain.waterMask[py * terrain.W + px];
+        if (wet) {
+          if (Math.random() < 0.3) fx.ripple(px, py);
+        } else {
+          this.splashes.push({ x: px, y: py, age: 0 });
+        }
+      }
+    }
+    this.drops = this.drops.filter((d) => !d.done);
+    for (const s of this.splashes) s.age += dt;
+    this.splashes = this.splashes.filter((s) => s.age < 0.24);
+  }
+  draw(g) {
+    g.fillStyle = '#d4ecfa';
+    g.globalAlpha = 0.7;
+    for (const d of this.drops) {
+      const x = Math.round(d.x);
+      const y = Math.round(d.y);
+      g.fillRect(x, y, 1, 2);
+      g.fillRect(x + 1, y - 2, 1, 2);
+    }
+    g.globalAlpha = 0.85;
+    for (const s of this.splashes) {
+      const k = s.age / 0.24;
+      if (k < 0.33) {
+        g.fillRect(s.x, s.y, 1, 1);
+      } else if (k < 0.66) {
+        g.fillRect(s.x - 1, s.y - 1, 1, 1);
+        g.fillRect(s.x + 1, s.y - 1, 1, 1);
+        g.fillRect(s.x, s.y, 1, 1);
+      } else {
+        g.fillRect(s.x - 2, s.y - 1, 1, 1);
+        g.fillRect(s.x + 2, s.y - 1, 1, 1);
+      }
+    }
+    g.globalAlpha = 1;
   }
 }
 

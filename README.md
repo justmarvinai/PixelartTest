@@ -19,6 +19,7 @@ boot and rendered on a low-resolution canvas with integer scaling.
 - A pond with lapping foam, drifting glints, ripples, lily pads and reeds
 - A farm plot with crops, sunflowers, a scarecrow and auto-connecting fences
 - A full day/night cycle with a dithered lightmap, lamp posts and fireflies
+- Optional rain with splashes and pond ripples
 
 ## Controls
 
@@ -26,15 +27,18 @@ boot and rendered on a low-resolution canvas with integer scaling.
 | ------------------- | ---------------------------------------- |
 | WASD / arrow keys   | Move                                     |
 | Shift               | Run                                      |
-| Space / E / Enter   | Talk / interact (sign, villager, cat, hens) |
+| Space / E / Enter   | Talk / interact (sign, villager, cat, hens), otherwise hop |
 | G                   | Sprite gallery (all assets, animated)    |
 | T                   | Skip to the next time of day             |
+| R                   | Toggle rain                              |
 | H                   | Toggle the controls hint                 |
-| Touch               | Left thumb = stick, right thumb = hold to run, tap to talk |
+| Touch               | Left thumb = stick, right thumb = hold to run, tap to talk / hop |
+
+The Gallery button and the time badge in the corners are clickable too.
 
 Handy URL parameters: `?gallery` opens the sprite gallery, `?t=0.8` starts at
-night (0 to 1 is one full day), `?freeze` stops the clock, `?scale=6` forces
-the pixel scale.
+night (0 to 1 is one full day), `?freeze` stops the clock, `?rain` starts in
+the rain, `?scale=6` forces the pixel scale.
 
 ## Run locally
 

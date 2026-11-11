@@ -97,14 +97,21 @@ export function drawGallery(g, vw, vh, sections, t, scroll) {
   const M = 8;
   let y = M - scroll;
   drawText(g, 'SPRITE GALLERY', M, y, P.gold2, P.ink);
-  const hint = 'G: back   W/S: scroll';
-  if (textWidth(hint) + textWidth('SPRITE GALLERY') + 30 < vw) drawText(g, hint, vw - M - textWidth(hint), y, P.stone2, P.ink);
-  y += 14;
+  y += 12;
+  const hint = 'G or Back to return. W/S, wheel or drag to scroll.';
+  if (textWidth(hint) < vw - M * 2) {
+    drawText(g, hint, M, y, P.stone2, P.ink);
+    y += 14;
+  } else {
+    y += 4;
+  }
   for (const s of sections) {
     drawText(g, s.title, M, y, P.cream1, P.ink);
     y += 11;
+    // flow the items into rows
     let x = M;
     let rowH = 0;
+    const rows = [[]];
     for (const it of s.items) {
       const f0 = it.frames[0];
       const w = f0.width * it.scale + 8;
@@ -113,26 +120,20 @@ export function drawGallery(g, vw, vh, sections, t, scroll) {
         x = M;
         y += rowH + 4;
         rowH = 0;
+        rows.push([]);
       }
       rowH = Math.max(rowH, h);
       it._x = x;
       it._w = w;
       it._h = h;
       it._y = y;
+      rows[rows.length - 1].push(it);
       x += w + 4;
     }
-    // second pass so plates in a row share a baseline
-    let rowY = -1;
+    // plates in a row share one height so sprites stand on a common baseline
     let rowMax = 0;
-    const rows = [];
-    for (const it of s.items) {
-      if (it._y !== rowY) {
-        rowY = it._y;
-        rows.push([]);
-      }
-      rows[rows.length - 1].push(it);
-    }
     for (const row of rows) {
+      if (!row.length) continue;
       rowMax = Math.max(...row.map((i) => i._h));
       for (const it of row) {
         if (it._y + rowMax < 0 || it._y > vh) continue;

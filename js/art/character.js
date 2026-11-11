@@ -2,7 +2,7 @@
 // Head and body are separate so the head can bob, blink and keep its lighting
 // while body frames are mirrored for the second half of a walk cycle.
 import { P } from '../palette.js';
-import { sprite, flipH, stack } from '../pixel.js';
+import { sprite, flipH, stack, makeCanvas, ctxOf } from '../pixel.js';
 
 export const CHAR_W = 16;
 export const CHAR_H = 28;
@@ -271,12 +271,21 @@ export const VILLAGER = {
 
 // ----------------------------------------------------------------- assembly
 
-function frame(body, head, headDy = 0) {
+function frame(body, head, headDy = 0, headDx = 0) {
   // head grid sits on frame rows 1..14, body grid on rows 14..27
   return stack(CHAR_W, CHAR_H, [
     [body, 0, 14],
-    [head, 0, 1 + headDy],
+    [head, headDx, 1 + headDy],
   ]);
+}
+
+/** Tip the torso 1px forward over the legs: the running lean. */
+function lean(body) {
+  const c = makeCanvas(body.width, body.height);
+  const g = ctxOf(c);
+  g.drawImage(body, 0, 0, body.width, 8, 1, 0, body.width, 8);
+  g.drawImage(body, 0, 8, body.width, body.height - 8, 0, 8, body.width, body.height - 8);
+  return c;
 }
 
 export function buildCharacter(pal, name = 'char') {
@@ -301,11 +310,18 @@ export function buildCharacter(pal, name = 'char') {
     idle: [frame(bsI, hs, 0), frame(bsI, hs, 1)],
     blink: [frame(bsI, hsB, 0), frame(bsI, hsB, 1)],
     walk: [frame(bs[0], hs, 1), frame(bs[1], hs, 0), frame(bs[2], hs, 1), frame(bs[3], hs, 0)],
+    run: [
+      frame(lean(bs[0]), hs, 1, 1),
+      frame(lean(bs[1]), hs, 0, 1),
+      frame(lean(bs[2]), hs, 1, 1),
+      frame(lean(bs[3]), hs, 0, 1),
+    ],
   };
   const left = {
     idle: right.idle.map(flipH),
     blink: right.blink.map(flipH),
     walk: right.walk.map(flipH),
+    run: right.run.map(flipH),
   };
   const down = {
     idle: [frame(bdI, hd, 0), frame(bdI, hd, 1)],

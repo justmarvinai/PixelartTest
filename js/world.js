@@ -294,9 +294,9 @@ export function buildWorld(art) {
   }
   // dock posts
   for (const [px, py] of [
-    [tx(34) - 3, tx(17) + 4],
-    [tx(34) - 3, tx(17) + 17],
-    [tx(32) - 2, tx(17) + 17],
+    [tx(34) - 3, tx(17) + 5],
+    [tx(34) - 3, tx(17) + 20],
+    [tx(32) - 2, tx(17) + 20],
   ]) {
     add(art.props.dockPost, px, py, { kind: 'post' });
   }
